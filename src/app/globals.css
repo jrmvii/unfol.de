@@ -1,0 +1,180 @@
+/* Copyright (c) 2026 Jérémy Vtipil */
+/* Licensed under the GNU Affero General Public License v3.0 */
+
+@import "tailwindcss";
+
+:root {
+  --primary: #bababa;
+  --bg: #ffffff;
+  --text: #333333;
+  --font: system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* Fade-in animation for images on scroll */
+.fade-in {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Crossfade variant: opacity only, no vertical movement */
+[data-transition="crossfade"] .fade-in {
+  transform: none;
+}
+
+[data-transition="crossfade"] .fade-in.visible {
+  transform: none;
+}
+
+/* Page crossfade via View Transitions API */
+::view-transition-old(root) {
+  animation: vt-fade-out 0.3s ease-in-out;
+}
+
+::view-transition-new(root) {
+  animation: vt-fade-in 0.3s ease-in-out;
+}
+
+@keyframes vt-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Overlay slide-in animations — calc accounts for container p-6 (1.5rem) */
+@keyframes slide-in-top {
+  from { transform: translateY(calc(-100% - 3rem)); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slide-in-bottom {
+  from { transform: translateY(calc(100% + 3rem)); }
+  to { transform: translateY(0); }
+}
+
+/* Slide-out keyframes (reverse of slide-in) */
+@keyframes slide-out-top {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(-100% - 3rem)); }
+}
+
+@keyframes slide-out-bottom {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(100% + 3rem)); }
+}
+
+/* Category title view transitions — disable default size animation + blending */
+::view-transition-group(.cat-slide-top),
+::view-transition-group(.cat-slide-btm) {
+  animation-duration: 0s;
+}
+
+::view-transition-old(.cat-slide-top),
+::view-transition-new(.cat-slide-top),
+::view-transition-old(.cat-slide-btm),
+::view-transition-new(.cat-slide-btm) {
+  mix-blend-mode: normal;
+  object-fit: none;
+}
+
+/* Top position: old slides up, new slides down */
+::view-transition-old(.cat-slide-top) {
+  animation: slide-out-top 0.3s ease-in-out both;
+}
+
+::view-transition-new(.cat-slide-top) {
+  animation: slide-in-top 0.3s ease-in-out both;
+}
+
+/* Bottom position: old slides down, new slides up */
+::view-transition-old(.cat-slide-btm) {
+  animation: slide-out-bottom 0.3s ease-in-out both;
+}
+
+::view-transition-new(.cat-slide-btm) {
+  animation: slide-in-bottom 0.3s ease-in-out both;
+}
+
+/* Adaptive overlay color based on background brightness */
+[data-brightness="dark"]  { --overlay-color: #ffffff; }
+[data-brightness="light"] { --overlay-color: #333333; }
+[data-brightness="mid"]   { --overlay-color: var(--primary); }
+
+[data-brightness] {
+  transition: color 0.3s ease;
+}
+
+
+/* Disable page transition in slide-up mode */
+[data-transition="slide-up"] ::view-transition-old(root),
+[data-transition="slide-up"] ::view-transition-new(root) {
+  animation: none;
+}
+
+/* Hero gate — hide overlay, content below hero, and footer during waiting phase */
+[data-hero-waiting] > :not(main) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-hero-waiting] main > :not(:first-child) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Hero fade-in on entering */
+[data-hero-phase="entering"] main > :first-child {
+  animation: hero-fade-in 0.8s ease-out both;
+}
+
+/* Hero fade-out when duration expires */
+[data-hero-phase="leaving"] main > :first-child {
+  animation: hero-fade-out 0.6s ease-in both;
+}
+
+@keyframes hero-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes hero-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Keep hero hidden after fade-out completes */
+[data-hero-phase="done"] main > :first-child {
+  opacity: 0;
+}
+
+/* Homepage overlay: main needs relative for absolute hero */
+main {
+  position: relative;
+}
+
+/* Masonry fade-in when hero is done */
+[data-hero-phase="done"] main [data-home-content] {
+  animation: hero-fade-in 0.8s ease-out both;
+}
+
+/* Masonry columns: collapse to single column on small screens */
+@media (max-width: 768px) {
+  [data-masonry] {
+    column-count: 1 !important;
+  }
+}

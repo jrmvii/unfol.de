@@ -1,0 +1,25 @@
+{
+	# Wildcard cert via Cloudflare DNS challenge
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+# Root domain + wildcard subdomains
+unfol.de, *.unfol.de {
+	reverse_proxy app:3000
+}
+
+# Additional root domains (add as needed)
+wtco.io, *.wtco.io {
+	reverse_proxy app:3000
+}
+
+biarritz.digital, *.biarritz.digital {
+	reverse_proxy app:3000
+}
+
+# Custom domains — Caddy auto-provisions individual certs via ACME HTTP-01
+# Tenants point their CNAME/A to this server; Caddy handles TLS automatically.
+# The :443 catch-all matches any hostname not listed above.
+:443 {
+	reverse_proxy app:3000
+}

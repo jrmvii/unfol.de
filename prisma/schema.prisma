@@ -1,0 +1,232 @@
+// Copyright (c) 2026 Jérémy Vtipil
+// Licensed under the GNU Affero General Public License v3.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Tenant (one per artist/portfolio site)
+// ============================================================
+
+model Tenant {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  domain    String?  @unique
+  bio       String?
+  email     String?
+
+  primaryColor String @default("#bababa")
+  bgColor      String @default("#ffffff")
+  fontFamily   String @default("system-ui")
+  /// Valid: "system" | "google" | "custom" — validated by Zod
+  fontSource   String @default("system")
+
+  /// Valid: "standard" | "fullscreen" — validated by Zod
+  portfolioLayout String @default("standard")
+
+  /// Valid: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "hidden"
+  homePosition    String @default("top-left")
+  navPosition     String @default("top-right")
+  titlePosition   String @default("hidden")
+  aboutPosition   String @default("hidden")
+
+  aboutPageId     String?
+  aboutPage       Page?   @relation("TenantAboutPage", fields: [aboutPageId], references: [id], onDelete: SetNull)
+  homePageId      String?
+  homePage        Page?   @relation("TenantHomePage", fields: [homePageId], references: [id], onDelete: SetNull)
+
+  /// Valid: "fade" | "slide"
+  overlayAnimation String @default("fade")
+  navAutoExpand    Boolean @default(false)
+  navLabel         String  @default("Projects")
+  aboutLabel       String  @default("About")
+
+  /// Valid: "slide-up" | "crossfade"
+  transitionStyle String @default("slide-up")
+  heroDuration    Int     @default(0)
+  logoUrl         String?
+  faviconUrl      String?
+
+  instagramUrl String?
+  behanceUrl   String?
+  linkedinUrl  String?
+  websiteUrl   String?
+  featured     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  categories   Category[]
+  projects     Project[]
+  pages        Page[]
+}
+
+// ============================================================
+// Auth
+// ============================================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  name          String?
+  emailVerified Boolean  @default(false)
+  /// Valid: "ADMIN" — validated by Zod
+  role          String   @default("ADMIN")
+  tenantId      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  token     String    @unique  // SHA-256 hash of the raw token
+  email     String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  token     String    @unique  // SHA-256 hash of the raw token
+  email     String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+}
+
+// ============================================================
+// Content
+// ============================================================
+
+model Category {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  slug        String
+  columnCount Int      @default(1)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects Project[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, sortOrder])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  tenantId    String
+  categoryId  String
+  title       String
+  slug        String
+  description String?
+  sortOrder   Int      @default(0)
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  media    Media[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, categoryId, sortOrder])
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  tenantId  String
+  title     String
+  slug      String
+  content   String   @default("")
+
+  /// Valid: "text-centered" | "text-wide" | "text-columns" | "masonry"
+  template  String   @default("text-centered")
+  columns   Int      @default(1)
+  showTitle Boolean  @default(true)
+  published Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  aboutForTenants Tenant[] @relation("TenantAboutPage")
+  homeForTenants  Tenant[] @relation("TenantHomePage")
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, sortOrder])
+}
+
+model Media {
+  id            String   @id @default(cuid())
+  projectId     String
+  filename      String
+  path          String
+  mimeType      String
+  width         Int?
+  height        Int?
+  sizeBytes     Int?
+  altText       String?
+  sortOrder     Int      @default(0)
+  blurDataUrl   String?
+  optimizedPath String?
+  createdAt     DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sortOrder])
+}
+
+// ============================================================
+// Analytics (no FK to Tenant — fast writes, no cascade side-effects)
+// ============================================================
+
+model PageView {
+  id          String   @id @default(cuid())
+  tenantId    String
+  path        String
+  /// Valid: "home" | "category" | "project" | "page"
+  pageType    String
+  resourceId  String?
+  visitorHash String
+  referrer    String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([visitorHash, tenantId, createdAt])
+}
+
+model AnalyticsDaily {
+  id             String @id @default(cuid())
+  tenantId       String
+  date           String // ISO date "2026-02-22"
+  path           String
+  /// Valid: "home" | "category" | "project" | "page"
+  pageType       String
+  resourceId     String?
+  views          Int    @default(0)
+  uniqueVisitors Int    @default(0)
+  referrerJson   String @default("{}")
+
+  @@unique([tenantId, date, path])
+  @@index([tenantId, date])
+}
